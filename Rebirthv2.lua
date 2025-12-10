@@ -131,6 +131,7 @@ local function startRebirthHandler(remote)
             pcall(function()
                 remote:FireServer("Rebirth", {{}})
                 remote:FireServer("Rebirth", {{}})
+                remote:FireServer("Rebirth", {{}})
             end)
             task.defer(function()
                 pcall(function()
@@ -284,3 +285,4 @@ end
 
 -- run
 spawn(main)
+
