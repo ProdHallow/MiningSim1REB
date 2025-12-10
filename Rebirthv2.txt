@@ -1,310 +1,286 @@
-getgenv().Name = "Use 30K Setup"
+getgenv().Name = getgenv().Name or "BhopGod & AirJordan Made This!"
+getgenv().Depth = getgenv().Depth or 410
+getgenv().SellThreshold = getgenv().SellThreshold or 30000
 
-task.wait(1)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local LocalPlayer = Players.LocalPlayer
 
-local virtual = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:Connect(function()
-    virtual:CaptureController()
-    virtual:ClickButton2(Vector2.new())
-end)
-
-local LocalPlayer = game.Players.LocalPlayer
-local Character = LocalPlayer.Character
-local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
-local Path1 = Instance.new("Part", game:GetService("Workspace"))
-Character.Head.CustomPlayerTag.PlayerName.Text = getgenv().Name
-Character.Head.CustomPlayerTag.MinerRank.Text = "Made By Zeta & AirJordan"
-
-do
-    local Depth
-    local SellThreshold
-
-    if not getgenv().SellThreshold then
-        SellThreshold = 30000
-    else
-        SellThreshold = getgenv().SellThreshold
+-- simple split (kept similar to your provided logic)
+local function split(s, delimiter)
+    local result = {}
+    for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
+        table.insert(result, match)
     end
+    return result
+end
 
-    if not getgenv().Depth then
-        Depth = 405
-    else
-        Depth = getgenv().Depth
-    end
-
-    do
-        repeat wait() until game:IsLoaded()
-        game:GetService("Players").LocalPlayer.PlayerGui:WaitForChild("ScreenGui")
-        while game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui.LoadingFrame.BackgroundTransparency == 0 do
-            for i, connection in pairs(getconnections(game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui.LoadingFrame.Quality.LowQuality.MouseButton1Down)) do
-                connection:Fire()
-            end
-            wait()
-        end
-        while true do
-            if pcall(function() game.Players.LocalPlayer.leaderstats:WaitForChild("Blocks Mined") end) then
-                if pcall(function() game.Players.LocalPlayer.PlayerGui.ScreenGui.StatsFrame.Coins:FindFirstChild("Amount") end) then
-                    if game.Players.LocalPlayer.PlayerGui.ScreenGui.StatsFrame.Tokens.Amount.Text ~= "Loading..." then
-                        break
-                    end
-                end
-            end
-            wait(1)
-        end
-        game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui.TeleporterFrame:Destroy()
-        game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui.StatsFrame.Sell:Destroy()
-        game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui.MainButtons.Surface:Destroy()
-    end
-
-    local vuAF = game:GetService("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:Connect(function()
-        vuAF:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-        wait(1)
-        vuAF:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+local function setupAntiAfk()
+    VirtualUser:CaptureController()
+    LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
     end)
-    
-    local Remote
-    Workspace.Collapsed.Changed:Connect(function()
-        if Workspace.Collapsed.Value == true then
+    -- alternate VirtualUser pattern seen in original
+    LocalPlayer.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    end)
+end
+
+local function waitForGameReady()
+    repeat task.wait() until game:IsLoaded()
+    local screenGui = LocalPlayer.PlayerGui:WaitForChild("ScreenGui")
+
+    while screenGui.LoadingFrame.BackgroundTransparency == 0 do
+        for _, connection in pairs(getconnections(screenGui.LoadingFrame.Quality.LowQuality.MouseButton1Down)) do
+            pcall(function() connection:Fire() end)
         end
-        local HumanoidRootPart = game.Players.LocalPlayer.Character.HumanoidRootPart
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 0
-        game.Players.LocalPlayer.Character.Humanoid.JumpPower = 0
-        HumanoidRootPart.Anchored = true
-        Remote:FireServer("MoveTo", {{"LavaSpawn"}})
-        local className = "Part"
-        local parent = game.Workspace
-        local part = Instance.new(className, parent)
-        part.Anchored = true
-        part.Size = Vector3.new(10, 0.5, 100)
-        part.Material = "ForceField"
-        local pos = Vector3.new(21, 9.5, 26285)
-        part.Position = pos
-        wait(1)
-        HumanoidRootPart.Anchored = false
-        while HumanoidRootPart.Position.Z > 26220 do
-            HumanoidRootPart.CFrame = CFrame.new(Vector3.new(HumanoidRootPart.Position.X, 13.05, HumanoidRootPart.Position.Z - 0.5))
-            wait()
-        end
-        HumanoidRootPart.CFrame = CFrame.new(17, 10, 26220)
-        local function Split(s, delimiter)
-            local result = {}
-            for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
-                table.insert(result, match)
-            end
-            return result
-        end
-        local RunService = game:GetService("RunService").Stepped
-        local HumanoidRootPart = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local depth = Split(game.Players.LocalPlayer.PlayerGui.ScreenGui.TopInfoFrame.Depth.Text, " ")
-        while tonumber(depth[1]) < Depth do
-            local min = HumanoidRootPart.CFrame + Vector3.new(-1, -10, -1)
-            local max = HumanoidRootPart.CFrame + Vector3.new(1, 0, 1)
-            local region = Region3.new(min.Position, max.Position)
-            local parts = workspace:FindPartsInRegion3WithWhiteList(region, {game.Workspace.Blocks}, 5)
-            for _, block in pairs(parts) do
-                Remote:FireServer("MineBlock", {{block.Parent}})
-                RunService:Wait()
-            end
-            depth = Split(game.Players.LocalPlayer.PlayerGui.ScreenGui.TopInfoFrame.Depth.Text, " ")
-            wait()
-        end
+        task.wait()
+    end
+
+    repeat task.wait(1) until (pcall(function() LocalPlayer.leaderstats:WaitForChild("Blocks Mined") end)
+        and pcall(function() screenGui.StatsFrame.Coins:FindFirstChild("Amount") end)
+        and screenGui.StatsFrame.Tokens.Amount.Text ~= "Loading...")
+
+    pcall(function()
+        screenGui.TeleporterFrame:Destroy()
+        screenGui.StatsFrame.Sell:Destroy()
+        screenGui.MainButtons.Surface:Destroy()
     end)
 
-    do
-        local Data = getsenv(game:GetService("Players").LocalPlayer.PlayerGui.ScreenGui.ClientScript).displayCurrent
-        local Values = getupvalue(Data, 8)
-        Remote = Values["RemoteEvent"]
-        Data, Values = nil
+    return screenGui
+end
+
+local function getRemote()
+    local ok, rem = pcall(function()
+        local data = getsenv(LocalPlayer.PlayerGui.ScreenGui.ClientScript).displayCurrent
+        local values = getupvalue(data, 8)
+        local remote = values and values["RemoteEvent"]
+        data, values = nil, nil
+        return remote
+    end)
+    if ok then return rem end
+    return nil
+end
+
+local function createForcePlatform(pos)
+    local part = Instance.new("Part", workspace)
+    part.Anchored = true
+    part.Size = Vector3.new(10, 0.5, 100)
+    part.Material = Enum.Material.ForceField
+    part.Position = pos
+    return part
+end
+
+local function moveToLavaSpawn(remote, humanoidRootPart)
+    if not remote or not humanoidRootPart then return end
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = 0
+        char.Humanoid.JumpPower = 0
     end
-
-    do
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/ProdHallow/Miningsimrebirthtracker/main/miningsimrebirthtracker", true))()
+    humanoidRootPart.Anchored = true
+    pcall(function() remote:FireServer("MoveTo", {{"LavaSpawn"}}) end)
+    local platform = createForcePlatform(Vector3.new(21, 9.5, 26285))
+    task.wait(1)
+    humanoidRootPart.Anchored = false
+    while humanoidRootPart.Position.Z > 26220 do
+        humanoidRootPart.CFrame = CFrame.new(Vector3.new(humanoidRootPart.Position.X, 13.05, humanoidRootPart.Position.Z - 0.5))
+        task.wait()
     end
+    humanoidRootPart.CFrame = CFrame.new(18, 10, 26220)
+    if platform and platform.Parent then pcall(function() platform:Destroy() end) end
+end
 
-    wait(1)
-
-    do
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/DeleteAssetMinSim1/main/deleteassetsminingsim'))()
-    end
-
-    wait(1)
-
-    do
-        local HumanoidRootPart = game.Players.LocalPlayer.Character.HumanoidRootPart
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 0
-        game.Players.LocalPlayer.Character.Humanoid.JumpPower = 0
-        HumanoidRootPart.Anchored = true
-        Remote:FireServer("MoveTo", {{"LavaSpawn"}})
-        local className = "Part"
-        local parent = game.Workspace
-        local part = Instance.new(className, parent)
-        part.Anchored = true
-        part.Size = Vector3.new(10, 0.5, 100)
-        part.Material = "ForceField"
-        local pos = Vector3.new(21, 9.5, 26285)
-        part.Position = pos
-        wait(1)
-        HumanoidRootPart.Anchored = false
-        while HumanoidRootPart.Position.Z > 26220 do
-            HumanoidRootPart.CFrame = CFrame.new(Vector3.new(HumanoidRootPart.Position.X, 13.05, HumanoidRootPart.Position.Z - 0.5))
-            wait()
+local function mineUntilDepth(remote, humanoidRootPart, screenGui, targetDepth)
+    if not remote or not humanoidRootPart or not screenGui then return end
+    local runService = RunService.Heartbeat
+    local depthText = split(screenGui.TopInfoFrame.Depth.Text, " ")
+    while tonumber(depthText[1]) < targetDepth do
+        local min = humanoidRootPart.CFrame + Vector3.new(-1, -10, -1)
+        local max = humanoidRootPart.CFrame + Vector3.new(1, 0, 1)
+        local region = Region3.new(min.Position, max.Position)
+        local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 5)
+        for _, block in pairs(parts) do
+            pcall(function() remote:FireServer("MineBlock", {{block.Parent}}) end)
+            runService:Wait()
         end
-        HumanoidRootPart.CFrame = CFrame.new(17, 10, 26220)
-    end
-
-    do
-        local function Split(s, delimiter)
-            local result = {}
-            for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
-                table.insert(result, match)
-            end
-            return result
-        end
-        local RunService = game:GetService("RunService").Stepped
-        local HumanoidRootPart = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local depth = Split(game.Players.LocalPlayer.PlayerGui.ScreenGui.TopInfoFrame.Depth.Text, " ")
-        while tonumber(depth[1]) < Depth do
-            local min = HumanoidRootPart.CFrame + Vector3.new(-1, -10, -1)
-            local max = HumanoidRootPart.CFrame + Vector3.new(1, 0, 1)
-            local region = Region3.new(min.Position, max.Position)
-            local parts = workspace:FindPartsInRegion3WithWhiteList(region, {game.Workspace.Blocks}, 5)
-            for _, block in pairs(parts) do
-                Remote:FireServer("MineBlock", {{block.Parent}})
-                RunService:Wait()
-            end
-            depth = Split(game.Players.LocalPlayer.PlayerGui.ScreenGui.TopInfoFrame.Depth.Text, " ")
-            wait()
-        end
-    end
-
-    do
-        local CoinsAmount = game.Players.LocalPlayer.leaderstats.Coins
-        local function GetCoinsAmount()
-            local Amount = CoinsAmount.Value
-            Amount = Amount:gsub(',', '')
-            return tonumber(Amount)
-        end
-
-        local function comma_value(amount)
-            local formatted = amount
-            while true do
-                formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
-                if (k == 0) then
-                    break
-                end
-            end
-            return formatted
-        end
-
-        local function Split(s, delimiter)
-            local result = {}
-            for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
-                table.insert(result, match)
-            end
-            return result
-        end
-
-        local recovering = false
-        local DepthAmount = game.Players.LocalPlayer.PlayerGui.ScreenGui.TopInfoFrame.Depth
-        DepthAmount.Changed:Connect(function()
-            local depth = Split(DepthAmount.Text, " ")
-            if tonumber(depth[1]) >= 1000 then
-                recovering = true
-                local HumanoidRootPart = game.Players.LocalPlayer.Character.HumanoidRootPart
-                game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 0
-                game.Players.LocalPlayer.Character.Humanoid.JumpPower = 0
-                HumanoidRootPart.Anchored = true
-                Remote:FireServer("MoveTo", {{"LavaSpawn"}})
-                local className = "Part"
-                local parent = game.Workspace
-                local part = Instance.new(className, parent)
-                part.Anchored = true
-                part.Size = Vector3.new(10, 0.5, 100)
-                part.Material = "ForceField"
-                local pos = Vector3.new(21, 9.5, 26285)
-                part.Position = pos
-                wait(1)
-                HumanoidRootPart.Anchored = false
-                while HumanoidRootPart.Position.Z > 26220 do
-                    HumanoidRootPart.CFrame = CFrame.new(Vector3.new(HumanoidRootPart.Position.X, 13.05, HumanoidRootPart.Position.Z - 0.5))
-                    wait()
-                end
-                HumanoidRootPart.CFrame = CFrame.new(17, 10, 26220)
-                wait(5)
-                recovering = false
-            end
-        end)
-
-        local RebirthsAmount = game.Players.LocalPlayer.leaderstats.Rebirths
-        game:GetService("RunService"):BindToRenderStep("Rebirth", Enum.RenderPriority.Camera.Value, function()
-            while GetCoinsAmount() >= (10000000 * (RebirthsAmount.Value + 1)) do
-                Remote:FireServer("Rebirth", {{}})
-                wait()
-            end
-        end)
-
-        local InventoryAmount = game.Players.LocalPlayer.PlayerGui.ScreenGui.StatsFrame2.Inventory.Amount
-        local function GetInventoryAmount()
-            local Amount = InventoryAmount.Text
-            Amount = Amount:gsub('%s+', '')
-            Amount = Amount:gsub(',', '')
-            local Inventory = Amount:split("/")
-            return tonumber(Inventory[1])
-        end
-
-        local RunService = game:GetService("RunService").Stepped
-        local HumanoidRootPart = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local Character = game.Players.LocalPlayer.Character
-        local SellArea = CFrame.new(41.96064, 14, -1239.64648, 1, 0, 0, 0, 1, 0, 0, 0, 1)
-
-        local function setPlatformStand(state)
-            if Character and Character:FindFirstChild("Humanoid") then
-                Character.Humanoid.PlatformStand = state
-                if state then
-                    HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                end
-            end
-        end
-
-        while true do
-            if HumanoidRootPart then
-                local minp = HumanoidRootPart.CFrame.Position + Vector3.new(-5, -5, -5)
-                local maxp = HumanoidRootPart.CFrame.Position + Vector3.new(5, 5, 5)
-                local region = Region3.new(minp, maxp)
-                local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 100)
-
-                for _, block in pairs(parts) do
-                    if block:IsA("BasePart") then
-                        Remote:FireServer("MineBlock", {{block.Parent}})
-                        repeat
-                            RunService:Wait()
-                        until not recovering
-                    end
-                    if GetInventoryAmount() >= SellThreshold then
-                        if Character then
-                            if HumanoidRootPart then
-                                local SavedPosition = HumanoidRootPart.Position
-                                while GetInventoryAmount() >= SellThreshold do
-                                    HumanoidRootPart.CFrame = SellArea
-                                    Remote:FireServer("SellItems", {{}})
-                                    RunService:Wait()
-                                end
-                                setPlatformStand(true)
-                                local starttime1 = os.time()
-                                while (HumanoidRootPart.Position - SavedPosition).Magnitude > 1 do
-                                    HumanoidRootPart.CFrame = CFrame.new(18, SavedPosition.Y + 2, 26220)
-                                    RunService:Wait()
-                                    if os.time() - starttime1 > 5 then
-                                        break
-                                    end
-                                end
-                                setPlatformStand(false)
-                            end
-                        end
-                    end
-                end
-            end
-            RunService:Wait()
-        end
+        depthText = split(screenGui.TopInfoFrame.Depth.Text, " ")
+        task.wait()
     end
 end
+
+local function startRebirthHandler(remote)
+    if not remote then return end
+    local coinsAmountLbl = LocalPlayer.leaderstats and LocalPlayer.leaderstats:FindFirstChild("Coins")
+    local rebirthsAmount = LocalPlayer.leaderstats and LocalPlayer.leaderstats:FindFirstChild("Rebirths")
+    if not rebirthsAmount or not coinsAmountLbl then return end
+
+    local function getCoinsAmount()
+        local amount = tostring(coinsAmountLbl.Value)
+        amount = amount:gsub(',', '')
+        return tonumber(amount) or 0
+    end
+
+    RunService:BindToRenderStep("Rebirth", Enum.RenderPriority.First.Value, function()
+        if getCoinsAmount() >= (10000000 * (rebirthsAmount.Value + 1)) then
+            -- preserve the aggressive rebirth calls from your logic
+            pcall(function()
+                remote:FireServer("Rebirth", {{}})
+                remote:FireServer("Rebirth", {{}})
+            end)
+            task.defer(function()
+                pcall(function()
+                    remote:FireServer("Rebirth", {{}})
+                    remote:FireServer("Rebirth", {{}})
+                end)
+            end)
+        end
+    end)
+end
+
+local function startMainLoop(remote, screenGui, humanoidRootPart, depthTarget, sellThreshold)
+    if not remote or not screenGui or not humanoidRootPart then return end
+    local recovering = false
+
+    -- depth change recovery
+    local depthAmountLbl = screenGui.TopInfoFrame.Depth
+    depthAmountLbl.Changed:Connect(function()
+        local depthText = split(depthAmountLbl.Text, " ")
+        if tonumber(depthText[1]) >= 1500 and not recovering then
+            recovering = true
+            moveToLavaSpawn(remote, humanoidRootPart)
+            task.wait(5)
+            recovering = false
+        end
+    end)
+
+    local inventoryLbl = screenGui.StatsFrame2.Inventory.Amount
+    local function getInventoryAmount()
+        local amount = tostring(inventoryLbl.Text)
+        amount = amount:gsub('%s+', ''):gsub(',', '')
+        local inv = amount:split("/")
+        return tonumber(inv[1]) or 0
+    end
+
+    local sellArea = CFrame.new(41.96064, 14, -1239.64648)
+
+    local function setPlatformStand(state)
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.PlatformStand = state
+            if state and humanoidRootPart then humanoidRootPart.Velocity = Vector3.new(0,0,0) end
+        end
+    end
+
+    while true do
+        if humanoidRootPart then
+            local minp = humanoidRootPart.CFrame.Position + Vector3.new(-10, -10, -10)
+            local maxp = humanoidRootPart.CFrame.Position + Vector3.new(10, 10, 10)
+            local region = Region3.new(minp, maxp)
+            local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 100)
+
+            for _, block in pairs(parts) do
+                if block:IsA("BasePart") then
+                    pcall(function() remote:FireServer("MineBlock", {{block.Parent}}) end)
+                    repeat
+                        RunService.Heartbeat:Wait()
+                    until not recovering
+                end
+
+                if getInventoryAmount() >= sellThreshold then
+                    if humanoidRootPart then
+                        local savedPosition = humanoidRootPart.Position
+                        while getInventoryAmount() >= sellThreshold do
+                            humanoidRootPart.CFrame = sellArea
+                            pcall(function()
+                                remote:FireServer("SellItems", {{}})
+                                remote:FireServer("SellItems", {{}})
+                                remote:FireServer("SellItems", {{}})
+                            end)
+                            task.defer(function()
+                                pcall(function()
+                                    remote:FireServer("SellItems", {{}})
+                                    remote:FireServer("SellItems", {{}})
+                                end)
+                            end)
+                            RunService.RenderStepped:Wait()
+                        end
+
+                        setPlatformStand(true)
+                        local startTime = os.time()
+                        while (humanoidRootPart.Position - savedPosition).Magnitude > 1 do
+                            humanoidRootPart.CFrame = CFrame.new(18, savedPosition.Y + 2, 26220)
+                            RunService.Heartbeat:Wait()
+                            if os.time() - startTime > 5 then break end
+                        end
+                        setPlatformStand(false)
+                    end
+                end
+            end
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- Entrypoint that wires everything using the provided logic
+local function main()
+    setupAntiAfk()
+    localPlayer = LocalPlayer
+
+    -- wait for UI ready and cleanup
+    local screenGui = waitForGameReady()
+
+    -- set player tags
+    pcall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
+            LocalPlayer.Character.Head.CustomPlayerTag.PlayerName.Text = getgenv().Name
+            LocalPlayer.Character.Head.CustomPlayerTag.MinerRank.Text = getgenv().Name
+        end
+    end)
+
+    -- grab humanoid root part reference
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- monitor workspace collapse (preserve original behaviour: restart main on collapse)
+    workspace.Collapsed.Changed:Connect(function()
+        if workspace.Collapsed.Value then
+            -- restart logic similar to provided script
+            spawn(function() main() end)
+        end
+    end)
+
+    -- obtain remote
+    local remote = getRemote()
+
+    -- run external loaders (kept as in your logic)
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ProdHallow/Miningsimrebirthtracker/main/miningsimrebirthtracker", true))()
+    end)
+    task.wait(1)
+    pcall(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/DeleteAssetMinSim1/main/deleteassetsminingsim'))()
+    end)
+    task.wait(1)
+    pcall(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/rebirthtracker/main/rebirthtracker'))()
+    end)
+    task.wait(1)
+
+    -- initial move and mine pass (preserve behavior)
+    moveToLavaSpawn(remote, humanoidRootPart)
+    mineUntilDepth(remote, humanoidRootPart, screenGui, getgenv().Depth)
+
+    -- start rebirth handler
+    startRebirthHandler(remote)
+
+    -- start main loop (mining, selling, recovery)
+    startMainLoop(remote, screenGui, humanoidRootPart, getgenv().Depth, getgenv().SellThreshold)
+end
+
+-- run
+spawn(main)
