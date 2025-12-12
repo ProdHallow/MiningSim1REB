@@ -50,12 +50,11 @@ local Gui = Instance.new("ScreenGui")
 Gui.Name = "MinerGUI"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-Gui.Parent = game.CoreGui
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.new(0, 200, 0, 155)
-Main.Position = UDim2.new(0, 15, 0.5, -77)
+Main.Size = UDim2.new(0, 220, 0, 170)
+Main.Position = UDim2.new(0, 20, 0.5, -85)
 Main.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
 Main.BorderSizePixel = 0
 Main.Active = true
@@ -114,8 +113,8 @@ CloseBtnCorner.CornerRadius = UDim.new(0, 5)
 CloseBtnCorner.Parent = CloseBtn
 
 local ModeLabel = Instance.new("TextLabel")
-ModeLabel.Size = UDim2.new(1, -16, 0, 16)
-ModeLabel.Position = UDim2.new(0, 8, 0, 35)
+ModeLabel.Size = UDim2.new(1, -16, 0, 18)
+ModeLabel.Position = UDim2.new(0, 8, 0, 38)
 ModeLabel.BackgroundTransparency = 1
 ModeLabel.Text = "SELECT MODE:"
 ModeLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
@@ -125,8 +124,8 @@ ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
 ModeLabel.Parent = Main
 
 local MiningBtn = Instance.new("TextButton")
-MiningBtn.Size = UDim2.new(0.46, 0, 0, 32)
-MiningBtn.Position = UDim2.new(0.02, 0, 0, 53)
+MiningBtn.Size = UDim2.new(0.46, 0, 0, 34)
+MiningBtn.Position = UDim2.new(0.02, 0, 0, 60)
 MiningBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 200)
 MiningBtn.Text = "⛏ MINING"
 MiningBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -144,8 +143,8 @@ MiningStroke.Thickness = 2
 MiningStroke.Parent = MiningBtn
 
 local RebirthBtn = Instance.new("TextButton")
-RebirthBtn.Size = UDim2.new(0.46, 0, 0, 32)
-RebirthBtn.Position = UDim2.new(0.52, 0, 0, 53)
+RebirthBtn.Size = UDim2.new(0.46, 0, 0, 34)
+RebirthBtn.Position = UDim2.new(0.52, 0, 0, 60)
 RebirthBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
 RebirthBtn.Text = "🔄 REBIRTH"
 RebirthBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -163,8 +162,8 @@ RebirthStroke.Thickness = 2
 RebirthStroke.Parent = RebirthBtn
 
 local StartBtn = Instance.new("TextButton")
-StartBtn.Size = UDim2.new(0.96, 0, 0, 40)
-StartBtn.Position = UDim2.new(0.02, 0, 0, 92)
+StartBtn.Size = UDim2.new(0.96, 0, 0, 42)
+StartBtn.Position = UDim2.new(0.02, 0, 0, 100)
 StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
 StartBtn.Text = "▶ START"
 StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -177,15 +176,17 @@ StartBtnCorner.CornerRadius = UDim.new(0, 6)
 StartBtnCorner.Parent = StartBtn
 
 local StatusInfo = Instance.new("TextLabel")
-StatusInfo.Size = UDim2.new(1, -16, 0, 16)
-StatusInfo.Position = UDim2.new(0, 8, 0, 137)
+StatusInfo.Size = UDim2.new(1, -16, 0, 18)
+StatusInfo.Position = UDim2.new(0, 8, 0, 148)
 StatusInfo.BackgroundTransparency = 1
-StatusInfo.Text = ""
+StatusInfo.Text = "Mode: Efficient Mining"
 StatusInfo.TextColor3 = Color3.fromRGB(255, 180, 80)
 StatusInfo.TextSize = 9
 StatusInfo.Font = Enum.Font.GothamBold
 StatusInfo.TextXAlignment = Enum.TextXAlignment.Left
 StatusInfo.Parent = Main
+
+Gui.Parent = game.CoreGui
 
 local function SelectMode(mode)
     getgenv().Mode = mode
@@ -437,7 +438,7 @@ local function stopScript()
     getgenv().Running = false
     Recovering = false
     ClearConnections()
-    StatusInfo.Text = ""
+    StatusInfo.Text = getgenv().Mode == "MINING" and "Mode: Efficient Mining" or "Mode: Rebirth Focus"
     StartBtn.Text = "▶ START"
     StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
 end
@@ -496,7 +497,7 @@ local function startScript()
     end)
     task.wait(1)
     pcall(function()
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/rebirthtracker/refs/heads/main/rebirthtracker.lua'))()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/rebirthtracker/main/rebirthtracker'))()
     end)
     task.wait(1)
 
