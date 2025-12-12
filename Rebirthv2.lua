@@ -197,7 +197,7 @@ local function SelectMode(mode)
         RebirthBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
         RebirthBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
         RebirthStroke.Color = Color3.fromRGB(70, 70, 90)
-        StatusInfo.Text = "Mode: Efficient Mining"
+        StatusInfo.Text = "Mode: Max Mining Power"
     else
         RebirthBtn.BackgroundColor3 = Color3.fromRGB(160, 80, 200)
         RebirthBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -386,14 +386,19 @@ local function startMainLoop()
 
     while getgenv().Running do
         if HRP then
-            local minp = HRP.CFrame.Position + Vector3.new(-10, -10, -10)
-            local maxp = HRP.CFrame.Position + Vector3.new(10, 10, 10)
+            local miningRange = getgenv().Mode == "MINING" and 15 or 10
+            local miningSpam = getgenv().Mode == "MINING" and 3 or 1
+            
+            local minp = HRP.CFrame.Position + Vector3.new(-miningRange, -miningRange, -miningRange)
+            local maxp = HRP.CFrame.Position + Vector3.new(miningRange, miningRange, miningRange)
             local region = Region3.new(minp, maxp)
-            local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 100)
+            local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 150)
 
             for _, block in pairs(parts) do
                 if block:IsA("BasePart") then
-                    pcall(function() Remote:FireServer("MineBlock", {{block.Parent}}) end)
+                    for i = 1, miningSpam do
+                        pcall(function() Remote:FireServer("MineBlock", {{block.Parent}}) end)
+                    end
                     repeat
                         RunService.Heartbeat:Wait()
                     until not Recovering
@@ -438,7 +443,7 @@ local function stopScript()
     getgenv().Running = false
     Recovering = false
     ClearConnections()
-    StatusInfo.Text = getgenv().Mode == "MINING" and "Mode: Efficient Mining" or "Mode: Rebirth Focus"
+    StatusInfo.Text = getgenv().Mode == "MINING" and "Mode: Max Mining Power" or "Mode: Rebirth Focus"
     StartBtn.Text = "▶ START"
     StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
 end
