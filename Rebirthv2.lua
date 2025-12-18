@@ -10,10 +10,10 @@ local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
 local Remote, ScreenGui, HRP
+local Recovering = false
 local Connections = {}
+local BotConnections = {} -- NEW: Separate connections for bot logic
 local RebirthBound = false
-local HasReachedTargetDepth = false
-local IsRestarting = false
 
 local function split(s, delimiter)
     local result = {}
@@ -25,13 +25,16 @@ end
 
 local function AddConnection(conn)
     if conn then Connections[#Connections + 1] = conn end
-    return conn
 end
 
-local function ClearConnections()
-    for i = #Connections, 1, -1 do
-        if Connections[i] then pcall(function() Connections[i]:Disconnect() end) end
-        Connections[i] = nil
+local function AddBotConnection(conn) -- NEW
+    if conn then BotConnections[#BotConnections + 1] = conn end
+end
+
+local function ClearBotConnections() -- NEW: Only clears bot-specific stuff
+    for i = #BotConnections, 1, -1 do
+        if BotConnections[i] then pcall(function() BotConnections[i]:Disconnect() end) end
+        BotConnections[i] = nil
     end
     if RebirthBound then
         pcall(function() RunService:UnbindFromRenderStep("Rebirth") end)
@@ -39,6 +42,24 @@ local function ClearConnections()
     end
 end
 
+local function ClearConnections()
+    ClearBotConnections() -- Also clear bot connections
+    for i = #Connections, 1, -1 do
+        if Connections[i] then pcall(function() Connections[i]:Disconnect() end) end
+        Connections[i] = nil
+    end
+end
+
+local function resetCharacterPhysics()
+    if LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hum then hum.PlatformStand = false end
+        if hrp then hrp.Anchored = false end
+    end
+end
+
+-- GUI SETUP
 if game.CoreGui:FindFirstChild("MinerGUI") then
     game.CoreGui:FindFirstChild("MinerGUI"):Destroy()
 end
@@ -47,11 +68,12 @@ local Gui = Instance.new("ScreenGui")
 Gui.Name = "MinerGUI"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = game.CoreGui
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.new(0, 220, 0, 190)
-Main.Position = UDim2.new(1, -240, 1, -210)
+Main.Size = UDim2.new(0, 220, 0, 170)
+Main.Position = UDim2.new(1, -240, 1, -190)
 Main.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
 Main.BorderSizePixel = 0
 Main.Active = true
@@ -66,6 +88,7 @@ local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
 TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
 TitleBar.Parent = Main
+
 local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = TitleBar
@@ -88,6 +111,7 @@ CloseBtn.Text = "×"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = TitleBar
+
 local CloseBtnCorner = Instance.new("UICorner")
 CloseBtnCorner.CornerRadius = UDim.new(0, 5)
 CloseBtnCorner.Parent = CloseBtn
@@ -110,6 +134,7 @@ MiningBtn.Text = "⛏ MINING"
 MiningBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MiningBtn.Font = Enum.Font.GothamBold
 MiningBtn.Parent = Main
+
 local MiningBtnCorner = Instance.new("UICorner")
 MiningBtnCorner.CornerRadius = UDim.new(0, 6)
 MiningBtnCorner.Parent = MiningBtn
@@ -122,6 +147,7 @@ RebirthBtn.Text = "🔄 REBIRTH"
 RebirthBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
 RebirthBtn.Font = Enum.Font.GothamBold
 RebirthBtn.Parent = Main
+
 local RebirthBtnCorner = Instance.new("UICorner")
 RebirthBtnCorner.CornerRadius = UDim.new(0, 6)
 RebirthBtnCorner.Parent = RebirthBtn
@@ -134,6 +160,7 @@ StartBtn.Text = "▶ START"
 StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 StartBtn.Font = Enum.Font.GothamBold
 StartBtn.Parent = Main
+
 local StartBtnCorner = Instance.new("UICorner")
 StartBtnCorner.CornerRadius = UDim.new(0, 6)
 StartBtnCorner.Parent = StartBtn
@@ -147,18 +174,6 @@ StatusInfo.TextColor3 = Color3.fromRGB(255, 180, 80)
 StatusInfo.Font = Enum.Font.GothamBold
 StatusInfo.TextXAlignment = Enum.TextXAlignment.Left
 StatusInfo.Parent = Main
-
-local DepthStatus = Instance.new("TextLabel")
-DepthStatus.Size = UDim2.new(1, -16, 0, 18)
-DepthStatus.Position = UDim2.new(0, 8, 0, 168)
-DepthStatus.BackgroundTransparency = 1
-DepthStatus.Text = "Depth: Waiting..."
-DepthStatus.TextColor3 = Color3.fromRGB(100, 200, 255)
-DepthStatus.Font = Enum.Font.GothamBold
-DepthStatus.TextXAlignment = Enum.TextXAlignment.Left
-DepthStatus.Parent = Main
-
-Gui.Parent = game.CoreGui
 
 local function SelectMode(mode)
     getgenv().Mode = mode
@@ -183,18 +198,14 @@ RebirthBtn.MouseButton1Click:Connect(function() SelectMode("REBIRTH") end)
 CloseBtn.MouseButton1Click:Connect(function()
     getgenv().Running = false
     ClearConnections()
-    if Gui then Gui:Destroy() end
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.PlatformStand = false
-        if LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.Anchored = false
-        end
-    end
+    resetCharacterPhysics()
+    Gui:Destroy()
 end)
 
+-- MAIN LOGIC
 local function setupAntiAfk()
     VirtualUser:CaptureController()
-    AddConnection(LocalPlayer.Idled:Connect(function()
+    AddBotConnection(LocalPlayer.Idled:Connect(function()
         VirtualUser:CaptureController()
         VirtualUser:ClickButton2(Vector2.new())
         VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
@@ -206,12 +217,14 @@ end
 local function waitForGameReady()
     repeat task.wait() until game:IsLoaded()
     local screenGui = LocalPlayer.PlayerGui:WaitForChild("ScreenGui")
+
     while screenGui.LoadingFrame.BackgroundTransparency == 0 do
-        for _, connection in pairs(getconnections(screenGui.LoadingFrame.Quality.LowQuality.MouseButton1Down)) do
-            connection:Fire()
+        for _, conn in pairs(getconnections(screenGui.LoadingFrame.Quality.LowQuality.MouseButton1Down)) do
+            conn:Fire()
         end
         task.wait()
     end
+
     while true do
         if pcall(function() return LocalPlayer.leaderstats:WaitForChild("Blocks Mined") end) and
            pcall(function() return screenGui.StatsFrame.Coins:FindFirstChild("Amount") end) and
@@ -220,11 +233,13 @@ local function waitForGameReady()
         end
         task.wait(1)
     end
+
     pcall(function()
         screenGui.TeleporterFrame:Destroy()
         screenGui.StatsFrame.Sell:Destroy()
         screenGui.MainButtons.Surface:Destroy()
     end)
+
     return screenGui
 end
 
@@ -239,17 +254,22 @@ end
 
 local function moveToLavaSpawn()
     if not Remote or not HRP then return end
+    
     HRP.Anchored = true
     LocalPlayer.Character.Humanoid.WalkSpeed = 0
     LocalPlayer.Character.Humanoid.JumpPower = 0
+    
     Remote:FireServer("MoveTo", {{"LavaSpawn"}})
+    
     local part = Instance.new("Part", workspace)
     part.Anchored = true
     part.Size = Vector3.new(10, 0.5, 100)
     part.Material = Enum.Material.ForceField
     part.Position = Vector3.new(21, 9.5, 26285)
+    
     task.wait(1)
     HRP.Anchored = false
+    
     while HRP.Position.Z > 26220 and getgenv().Running do
         HRP.CFrame = CFrame.new(Vector3.new(HRP.Position.X, 13.05, HRP.Position.Z - 0.5))
         task.wait()
@@ -259,74 +279,27 @@ local function moveToLavaSpawn()
 end
 
 local function mineUntilDepth(targetDepth)
-    if not ScreenGui or not HRP then return false end
-    
-    HasReachedTargetDepth = false
-    DepthStatus.Text = "Mining to depth " .. targetDepth .. "..."
-    DepthStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
-    
+    if not ScreenGui or not HRP then return end
     local depthText = split(ScreenGui.TopInfoFrame.Depth.Text, " ")
-    local currentDepth = tonumber(depthText[1]) or 0
-    
-    while currentDepth < targetDepth and getgenv().Running do
-        if not HRP or not HRP.Parent then 
-            return false 
-        end
-        
+    while tonumber(depthText[1]) < targetDepth and getgenv().Running do
+        if not HRP or not HRP.Parent then break end
         local min = HRP.CFrame + Vector3.new(-1, -10, -1)
         local max = HRP.CFrame + Vector3.new(1, 0, 1)
         local region = Region3.new(min.Position, max.Position)
         local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 5)
-        
         for _, block in pairs(parts) do
-            if not getgenv().Running then return false end
             Remote:FireServer("MineBlock", {{block.Parent}})
             RunService.Heartbeat:Wait()
         end
-        
         depthText = split(ScreenGui.TopInfoFrame.Depth.Text, " ")
-        currentDepth = tonumber(depthText[1]) or 0
-        DepthStatus.Text = "Depth: " .. currentDepth .. " / " .. targetDepth
         task.wait()
     end
-    
-    HasReachedTargetDepth = true
-    DepthStatus.Text = "✓ Target depth reached! Farming..."
-    DepthStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-    return true
-end
-
-local function getCurrentDepth()
-    if not ScreenGui then return 0 end
-    local ok, result = pcall(function()
-        local depthText = split(ScreenGui.TopInfoFrame.Depth.Text, " ")
-        return tonumber(depthText[1]) or 0
-    end)
-    return ok and result or 0
-end
-
-local function restartAfterCollapse()
-    if IsRestarting then return end
-    IsRestarting = true
-    HasReachedTargetDepth = false
-    
-    DepthStatus.Text = "⚠ Collapse! Restarting..."
-    DepthStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-    
-    task.wait(2)
-    
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = 0
-    end
-    
-    IsRestarting = false
 end
 
 local function runBotLogic()
+    ClearBotConnections() -- Clear old bot connections before starting new ones
     setupAntiAfk()
-    
-    HasReachedTargetDepth = false
-    IsRestarting = false
+    Recovering = false
     
     ScreenGui = waitForGameReady()
     if not ScreenGui then 
@@ -362,14 +335,11 @@ local function runBotLogic()
     task.wait(0.5)
 
     moveToLavaSpawn()
-    
-    local reachedDepth = mineUntilDepth(getgenv().Depth)
-    if not reachedDepth then
-        return
-    end
+    mineUntilDepth(getgenv().Depth)
 
     local coinsAmountLbl = LocalPlayer.leaderstats.Coins
     local rebirthsAmount = LocalPlayer.leaderstats.Rebirths
+    
     local function getCoinsAmount()
         local amount = tostring(coinsAmountLbl.Value):gsub(',', '')
         return tonumber(amount) or 0
@@ -378,33 +348,22 @@ local function runBotLogic()
     RebirthBound = true
     RunService:BindToRenderStep("Rebirth", Enum.RenderPriority.First.Value, function()
         if not getgenv().Running then return end
-        if not HasReachedTargetDepth then return end
-        
         if getCoinsAmount() >= (10000000 * (rebirthsAmount.Value + 1)) then
             Remote:FireServer("Rebirth", {{}})
             Remote:FireServer("Rebirth", {{}})
-            
-            HasReachedTargetDepth = false
-            task.spawn(function()
-                task.wait(1)
-                moveToLavaSpawn()
-                mineUntilDepth(getgenv().Depth)
+            Remote:FireServer("Rebirth", {{}})
+            task.defer(function()
+                Remote:FireServer("Rebirth", {{}})
+                Remote:FireServer("Rebirth", {{}})
             end)
         end
     end)
 
     local depthAmountLbl = ScreenGui.TopInfoFrame.Depth
-    local Recovering = false
-    
-    AddConnection(depthAmountLbl.Changed:Connect(function()
+    AddBotConnection(depthAmountLbl.Changed:Connect(function()
         local depthText = split(depthAmountLbl.Text, " ")
-        local currentDepth = tonumber(depthText[1]) or 0
-        
-        if HasReachedTargetDepth then
-            DepthStatus.Text = "Depth: " .. currentDepth .. " (Farming)"
-        end
-        
-        if currentDepth >= 1500 and not Recovering and getgenv().Running then
+        local depth = tonumber(depthText[1])
+        if depth and depth >= 1500 and not Recovering and getgenv().Running then
             Recovering = true
             moveToLavaSpawn()
             task.wait(2)
@@ -438,13 +397,19 @@ local function runBotLogic()
                     repeat RunService.Heartbeat:Wait() until not Recovering
                 end
 
-                if HasReachedTargetDepth and getInventoryAmount() >= getgenv().SellThreshold then
+                if getInventoryAmount() >= getgenv().SellThreshold then
                     if HRP then
                         local savedPosition = HRP.Position
                         
                         while getInventoryAmount() >= getgenv().SellThreshold and getgenv().Running do
                             HRP.CFrame = sellArea
                             Remote:FireServer("SellItems", {{}})
+                            Remote:FireServer("SellItems", {{}})
+                            Remote:FireServer("SellItems", {{}})
+                            task.defer(function()
+                                Remote:FireServer("SellItems", {{}})
+                                Remote:FireServer("SellItems", {{}})
+                            end)
                             RunService.RenderStepped:Wait()
                         end
 
@@ -477,15 +442,17 @@ local function monitorEvents()
     
     AddConnection(LocalPlayer.CharacterAdded:Connect(function()
         if getgenv().Running then
-            HasReachedTargetDepth = false
             task.wait(2)
             task.spawn(runBotLogic)
         end
     end))
-
+    
     AddConnection(workspace.Collapsed.Changed:Connect(function()
         if workspace.Collapsed.Value and getgenv().Running then
-            restartAfterCollapse()
+            task.wait(1)
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid.Health = 0
+            end
         end
     end))
 end
@@ -494,20 +461,13 @@ local function toggleScript()
     if getgenv().Running then
         getgenv().Running = false
         ClearConnections()
-        HasReachedTargetDepth = false
-        IsRestarting = false
+        resetCharacterPhysics()
+        Recovering = false
         StartBtn.Text = "▶ START"
         StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
-        DepthStatus.Text = "Stopped"
-        DepthStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
-        
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.PlatformStand = false
-            if HRP then HRP.Anchored = false end
-        end
     else
         getgenv().Running = true
-        HasReachedTargetDepth = false
+        Recovering = false
         StartBtn.Text = "⏹ STOP"
         StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
         monitorEvents()
