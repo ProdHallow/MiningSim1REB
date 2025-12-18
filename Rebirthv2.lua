@@ -12,7 +12,6 @@ local LocalPlayer = Players.LocalPlayer
 local Remote, ScreenGui, HRP
 local Recovering = false
 local Connections = {}
-local BotConnections = {} -- NEW: Separate connections for bot logic
 local RebirthBound = false
 
 local function split(s, delimiter)
@@ -27,26 +26,14 @@ local function AddConnection(conn)
     if conn then Connections[#Connections + 1] = conn end
 end
 
-local function AddBotConnection(conn) -- NEW
-    if conn then BotConnections[#BotConnections + 1] = conn end
-end
-
-local function ClearBotConnections() -- NEW: Only clears bot-specific stuff
-    for i = #BotConnections, 1, -1 do
-        if BotConnections[i] then pcall(function() BotConnections[i]:Disconnect() end) end
-        BotConnections[i] = nil
+local function ClearConnections()
+    for i = #Connections, 1, -1 do
+        if Connections[i] then pcall(function() Connections[i]:Disconnect() end) end
+        Connections[i] = nil
     end
     if RebirthBound then
         pcall(function() RunService:UnbindFromRenderStep("Rebirth") end)
         RebirthBound = false
-    end
-end
-
-local function ClearConnections()
-    ClearBotConnections() -- Also clear bot connections
-    for i = #Connections, 1, -1 do
-        if Connections[i] then pcall(function() Connections[i]:Disconnect() end) end
-        Connections[i] = nil
     end
 end
 
@@ -205,7 +192,7 @@ end)
 -- MAIN LOGIC
 local function setupAntiAfk()
     VirtualUser:CaptureController()
-    AddBotConnection(LocalPlayer.Idled:Connect(function()
+    AddConnection(LocalPlayer.Idled:Connect(function()
         VirtualUser:CaptureController()
         VirtualUser:ClickButton2(Vector2.new())
         VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
@@ -297,7 +284,6 @@ local function mineUntilDepth(targetDepth)
 end
 
 local function runBotLogic()
-    ClearBotConnections() -- Clear old bot connections before starting new ones
     setupAntiAfk()
     Recovering = false
     
@@ -360,7 +346,7 @@ local function runBotLogic()
     end)
 
     local depthAmountLbl = ScreenGui.TopInfoFrame.Depth
-    AddBotConnection(depthAmountLbl.Changed:Connect(function()
+    AddConnection(depthAmountLbl.Changed:Connect(function()
         local depthText = split(depthAmountLbl.Text, " ")
         local depth = tonumber(depthText[1])
         if depth and depth >= 1500 and not Recovering and getgenv().Running then
