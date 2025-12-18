@@ -1,4 +1,7 @@
-getgenv().Name = getgenv().Name or "BhopGod & AirJordan Made This!"
+-- GUI + Mining Script Combined
+-- Original logic from second script with GUI from first script
+
+getgenv().Name = getgenv().Name or "BhopGod & Walus Made This!"
 getgenv().Depth = getgenv().Depth or 410
 getgenv().SellThreshold = getgenv().SellThreshold or 30000
 getgenv().Mode = getgenv().Mode or "MINING"
@@ -9,26 +12,28 @@ local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
-local Remote, ScreenGui, HRP
-local Recovering = false
+local Remote, ScreenGui, HRP, Recovering, RebirthBound = nil, nil, nil, false, false
 local Connections = {}
-local RebirthBound = false
+local character = nil
 
+-- Simple split function
 local function split(s, delimiter)
     local result = {}
     for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
-        result[#result + 1] = match
+        table.insert(result, match)
     end
     return result
 end
 
-local function AddConnection(conn)
-    if conn then Connections[#Connections + 1] = conn end
+-- Connection management
+local function AddConnection(c)
+    if c then Connections[#Connections + 1] = c end
+    return c
 end
 
 local function ClearConnections()
     for i = #Connections, 1, -1 do
-        if Connections[i] then pcall(function() Connections[i]:Disconnect() end) end
+        pcall(function() Connections[i]:Disconnect() end)
         Connections[i] = nil
     end
     if RebirthBound then
@@ -37,239 +42,126 @@ local function ClearConnections()
     end
 end
 
-local function resetCharacterPhysics()
-    if LocalPlayer.Character then
-        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hum then hum.PlatformStand = false end
-        if hrp then hrp.Anchored = false end
-    end
+-- UI Creation helper
+local function createUI(name, class, props, parent)
+    local obj = Instance.new(class)
+    obj.Name = name or ""
+    for k, v in pairs(props or {}) do obj[k] = v end
+    obj.Parent = parent
+    return obj
 end
 
--- GUI SETUP
+-- Destroy existing GUI if present
 if game.CoreGui:FindFirstChild("MinerGUI") then
     game.CoreGui:FindFirstChild("MinerGUI"):Destroy()
 end
 
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "MinerGUI"
-Gui.ResetOnSpawn = false
-Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-Gui.Parent = game.CoreGui
+-- Create GUI (positioned bottom right)
+local Gui = createUI("MinerGUI", "ScreenGui", {ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, game.CoreGui)
+local Main = createUI("Main", "Frame", {Size = UDim2.new(0,220,0,170), Position = UDim2.new(1,-240,1,-190), BackgroundColor3 = Color3.fromRGB(18,18,25), BorderSizePixel = 0, Active = true, Draggable = true}, Gui)
+createUI("", "UICorner", {CornerRadius = UDim.new(0,10)}, Main)
+createUI("", "UIStroke", {Color = Color3.fromRGB(70,70,150), Thickness = 2}, Main)
 
-local Main = Instance.new("Frame")
-Main.Name = "Main"
-Main.Size = UDim2.new(0, 220, 0, 170)
-Main.Position = UDim2.new(1, -240, 1, -190)
-Main.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Draggable = true
-Main.Parent = Gui
+local TitleBar = createUI("", "Frame", {Size = UDim2.new(1,0,0,30), BackgroundColor3 = Color3.fromRGB(25,25,38), BorderSizePixel = 0}, Main)
+createUI("", "UICorner", {CornerRadius = UDim.new(0,10)}, TitleBar)
+createUI("", "Frame", {Size = UDim2.new(1,0,0,8), Position = UDim2.new(0,0,1,-8), BackgroundColor3 = Color3.fromRGB(25,25,38), BorderSizePixel = 0}, TitleBar)
+createUI("", "TextLabel", {Size = UDim2.new(1,-35,1,0), Position = UDim2.new(0,8,0,0), BackgroundTransparency = 1, Text = "⛏ HYPER MINER", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 13, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left}, TitleBar)
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 10)
-MainCorner.Parent = Main
+local CloseBtn = createUI("", "TextButton", {Size = UDim2.new(0,22,0,22), Position = UDim2.new(1,-26,0,4), BackgroundColor3 = Color3.fromRGB(200,50,50), Text = "×", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 14, Font = Enum.Font.GothamBold}, TitleBar)
+createUI("", "UICorner", {CornerRadius = UDim.new(0,5)}, CloseBtn)
 
-local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 30)
-TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
-TitleBar.Parent = Main
+createUI("", "TextLabel", {Size = UDim2.new(1,-16,0,18), Position = UDim2.new(0,8,0,38), BackgroundTransparency = 1, Text = "SELECT MODE:", TextColor3 = Color3.fromRGB(160,160,160), TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left}, Main)
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = TitleBar
+local MiningBtn = createUI("", "TextButton", {Size = UDim2.new(0.46,0,0,34), Position = UDim2.new(0.02,0,0,60), BackgroundColor3 = Color3.fromRGB(40,120,200), Text = "⛏ MINING", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 11, Font = Enum.Font.GothamBold}, Main)
+createUI("", "UICorner", {CornerRadius = UDim.new(0,6)}, MiningBtn)
+local MiningStroke = createUI("", "UIStroke", {Color = Color3.fromRGB(80,160,255), Thickness = 2}, MiningBtn)
 
-local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -35, 1, 0)
-TitleText.Position = UDim2.new(0, 8, 0, 0)
-TitleText.BackgroundTransparency = 1
-TitleText.Text = "⛏ HYPER MINER"
-TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleText.Font = Enum.Font.GothamBold
-TitleText.TextXAlignment = Enum.TextXAlignment.Left
-TitleText.Parent = TitleBar
+local RebirthBtn = createUI("", "TextButton", {Size = UDim2.new(0.46,0,0,34), Position = UDim2.new(0.52,0,0,60), BackgroundColor3 = Color3.fromRGB(50,50,65), Text = "🔄 REBIRTH", TextColor3 = Color3.fromRGB(180,180,180), TextSize = 11, Font = Enum.Font.GothamBold}, Main)
+createUI("", "UICorner", {CornerRadius = UDim.new(0,6)}, RebirthBtn)
+local RebirthStroke = createUI("", "UIStroke", {Color = Color3.fromRGB(70,70,90), Thickness = 2}, RebirthBtn)
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 22, 0, 22)
-CloseBtn.Position = UDim2.new(1, -26, 0, 4)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.Text = "×"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = TitleBar
+local StartBtn = createUI("", "TextButton", {Size = UDim2.new(0.96,0,0,42), Position = UDim2.new(0.02,0,0,100), BackgroundColor3 = Color3.fromRGB(40,170,80), Text = "▶ START", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 13, Font = Enum.Font.GothamBold}, Main)
+createUI("", "UICorner", {CornerRadius = UDim.new(0,6)}, StartBtn)
 
-local CloseBtnCorner = Instance.new("UICorner")
-CloseBtnCorner.CornerRadius = UDim.new(0, 5)
-CloseBtnCorner.Parent = CloseBtn
+local StatusInfo = createUI("", "TextLabel", {Size = UDim2.new(1,-16,0,18), Position = UDim2.new(0,8,0,148), BackgroundTransparency = 1, Text = "Mode: Mining Only (No Sell/Rebirth)", TextColor3 = Color3.fromRGB(255,180,80), TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left}, Main)
 
-local ModeLabel = Instance.new("TextLabel")
-ModeLabel.Size = UDim2.new(1, -16, 0, 18)
-ModeLabel.Position = UDim2.new(0, 8, 0, 38)
-ModeLabel.BackgroundTransparency = 1
-ModeLabel.Text = "SELECT MODE:"
-ModeLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-ModeLabel.Font = Enum.Font.GothamBold
-ModeLabel.TextXAlignment = Enum.TextXAlignment.Left
-ModeLabel.Parent = Main
-
-local MiningBtn = Instance.new("TextButton")
-MiningBtn.Size = UDim2.new(0.46, 0, 0, 34)
-MiningBtn.Position = UDim2.new(0.02, 0, 0, 60)
-MiningBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 200)
-MiningBtn.Text = "⛏ MINING"
-MiningBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MiningBtn.Font = Enum.Font.GothamBold
-MiningBtn.Parent = Main
-
-local MiningBtnCorner = Instance.new("UICorner")
-MiningBtnCorner.CornerRadius = UDim.new(0, 6)
-MiningBtnCorner.Parent = MiningBtn
-
-local RebirthBtn = Instance.new("TextButton")
-RebirthBtn.Size = UDim2.new(0.46, 0, 0, 34)
-RebirthBtn.Position = UDim2.new(0.52, 0, 0, 60)
-RebirthBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-RebirthBtn.Text = "🔄 REBIRTH"
-RebirthBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-RebirthBtn.Font = Enum.Font.GothamBold
-RebirthBtn.Parent = Main
-
-local RebirthBtnCorner = Instance.new("UICorner")
-RebirthBtnCorner.CornerRadius = UDim.new(0, 6)
-RebirthBtnCorner.Parent = RebirthBtn
-
-local StartBtn = Instance.new("TextButton")
-StartBtn.Size = UDim2.new(0.96, 0, 0, 42)
-StartBtn.Position = UDim2.new(0.02, 0, 0, 100)
-StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
-StartBtn.Text = "▶ START"
-StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-StartBtn.Font = Enum.Font.GothamBold
-StartBtn.Parent = Main
-
-local StartBtnCorner = Instance.new("UICorner")
-StartBtnCorner.CornerRadius = UDim.new(0, 6)
-StartBtnCorner.Parent = StartBtn
-
-local StatusInfo = Instance.new("TextLabel")
-StatusInfo.Size = UDim2.new(1, -16, 0, 18)
-StatusInfo.Position = UDim2.new(0, 8, 0, 148)
-StatusInfo.BackgroundTransparency = 1
-StatusInfo.Text = "Mode: Max Mining Power"
-StatusInfo.TextColor3 = Color3.fromRGB(255, 180, 80)
-StatusInfo.Font = Enum.Font.GothamBold
-StatusInfo.TextXAlignment = Enum.TextXAlignment.Left
-StatusInfo.Parent = Main
-
+-- Mode selection function
 local function SelectMode(mode)
     getgenv().Mode = mode
-    if mode == "MINING" then
-        MiningBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 200)
-        MiningBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        RebirthBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-        RebirthBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-        StatusInfo.Text = "Mode: Max Mining Power"
-    else
-        RebirthBtn.BackgroundColor3 = Color3.fromRGB(160, 80, 200)
-        RebirthBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        MiningBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-        MiningBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-        StatusInfo.Text = "Mode: Rebirth Focus"
-    end
+    local isMining = mode == "MINING"
+    MiningBtn.BackgroundColor3 = isMining and Color3.fromRGB(40,120,200) or Color3.fromRGB(50,50,65)
+    MiningBtn.TextColor3 = isMining and Color3.fromRGB(255,255,255) or Color3.fromRGB(180,180,180)
+    MiningStroke.Color = isMining and Color3.fromRGB(80,160,255) or Color3.fromRGB(70,70,90)
+    RebirthBtn.BackgroundColor3 = isMining and Color3.fromRGB(50,50,65) or Color3.fromRGB(160,80,200)
+    RebirthBtn.TextColor3 = isMining and Color3.fromRGB(180,180,180) or Color3.fromRGB(255,255,255)
+    RebirthStroke.Color = isMining and Color3.fromRGB(70,70,90) or Color3.fromRGB(200,120,255)
+    StatusInfo.Text = isMining and "Mode: Mining Only (No Sell/Rebirth)" or "Mode: Auto Sell & Rebirth"
 end
 
+-- Mode button connections
 MiningBtn.MouseButton1Click:Connect(function() SelectMode("MINING") end)
 RebirthBtn.MouseButton1Click:Connect(function() SelectMode("REBIRTH") end)
-
 CloseBtn.MouseButton1Click:Connect(function()
     getgenv().Running = false
     ClearConnections()
-    resetCharacterPhysics()
-    Gui:Destroy()
+    if Gui then Gui:Destroy() end
 end)
 
--- MAIN LOGIC
-local function setupAntiAfk()
-    VirtualUser:CaptureController()
-    AddConnection(LocalPlayer.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-        VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-        task.wait(1)
-        VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    end))
+-- Helper functions from original script
+local function getCoinsAmount()
+    local coinsAmount = LocalPlayer.leaderstats.Coins
+    local amount = tostring(coinsAmount.Value)
+    amount = amount:gsub(',', '')
+    return tonumber(amount)
 end
 
-local function waitForGameReady()
-    repeat task.wait() until game:IsLoaded()
-    local screenGui = LocalPlayer.PlayerGui:WaitForChild("ScreenGui")
+local function getInventoryAmount()
+    local inventoryAmount = ScreenGui.StatsFrame2.Inventory.Amount
+    local amount = inventoryAmount.Text
+    amount = amount:gsub('%s+', '')
+    amount = amount:gsub(',', '')
+    local inventory = amount:split("/")
+    return tonumber(inventory[1])
+end
 
-    while screenGui.LoadingFrame.BackgroundTransparency == 0 do
-        for _, conn in pairs(getconnections(screenGui.LoadingFrame.Quality.LowQuality.MouseButton1Down)) do
-            conn:Fire()
+local function setPlatformStand(state)
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.PlatformStand = state
+        if state and HRP then
+            HRP.Velocity = Vector3.new(0, 0, 0)
         end
-        task.wait()
     end
-
-    while true do
-        if pcall(function() return LocalPlayer.leaderstats:WaitForChild("Blocks Mined") end) and
-           pcall(function() return screenGui.StatsFrame.Coins:FindFirstChild("Amount") end) and
-           screenGui.StatsFrame.Tokens.Amount.Text ~= "Loading..." then
-            break
-        end
-        task.wait(1)
-    end
-
-    pcall(function()
-        screenGui.TeleporterFrame:Destroy()
-        screenGui.StatsFrame.Sell:Destroy()
-        screenGui.MainButtons.Surface:Destroy()
-    end)
-
-    return screenGui
 end
 
-local function getRemote()
-    local ok, rem = pcall(function()
-        local data = getsenv(LocalPlayer.PlayerGui.ScreenGui.ClientScript).displayCurrent
-        local values = getupvalue(data, 8)
-        return values["RemoteEvent"]
-    end)
-    return ok and rem or nil
-end
-
+-- Move to lava spawn function
 local function moveToLavaSpawn()
     if not Remote or not HRP then return end
-    
     HRP.Anchored = true
-    LocalPlayer.Character.Humanoid.WalkSpeed = 0
-    LocalPlayer.Character.Humanoid.JumpPower = 0
-    
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.WalkSpeed = 0
+        character.Humanoid.JumpPower = 0
+    end
     Remote:FireServer("MoveTo", {{"LavaSpawn"}})
-    
     local part = Instance.new("Part", workspace)
     part.Anchored = true
     part.Size = Vector3.new(10, 0.5, 100)
     part.Material = Enum.Material.ForceField
     part.Position = Vector3.new(21, 9.5, 26285)
-    
     task.wait(1)
     HRP.Anchored = false
-    
-    while HRP.Position.Z > 26220 and getgenv().Running do
+    while HRP.Position.Z > 26220 do
         HRP.CFrame = CFrame.new(Vector3.new(HRP.Position.X, 13.05, HRP.Position.Z - 0.5))
         task.wait()
     end
     HRP.CFrame = CFrame.new(18, 10, 26220)
-    if part then part:Destroy() end
+    pcall(function() part:Destroy() end)
 end
 
-local function mineUntilDepth(targetDepth)
-    if not ScreenGui or not HRP then return end
+-- Mine until depth function
+local function mineUntilDepth()
+    if not Remote or not HRP or not ScreenGui then return end
     local depthText = split(ScreenGui.TopInfoFrame.Depth.Text, " ")
-    while tonumber(depthText[1]) < targetDepth and getgenv().Running do
-        if not HRP or not HRP.Parent then break end
+    while tonumber(depthText[1]) < getgenv().Depth and getgenv().Running do
         local min = HRP.CFrame + Vector3.new(-1, -10, -1)
         local max = HRP.CFrame + Vector3.new(1, 0, 1)
         local region = Region3.new(min.Position, max.Position)
@@ -283,183 +175,194 @@ local function mineUntilDepth(targetDepth)
     end
 end
 
-local function runBotLogic()
-    setupAntiAfk()
+-- Stop script function
+local function stopScript()
+    getgenv().Running = false
     Recovering = false
-    
-    ScreenGui = waitForGameReady()
-    if not ScreenGui then 
-        getgenv().Running = false
-        StartBtn.Text = "▶ START"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
-        return 
-    end
+    ClearConnections()
+    StatusInfo.Text = getgenv().Mode == "MINING" and "Mode: Mining Only (No Sell/Rebirth)" or "Mode: Auto Sell & Rebirth"
+    StartBtn.Text = "▶ START"
+    StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
+end
 
+-- Main function (original logic)
+local function main()
+    if not getgenv().Running then return end
+    
+    task.wait(1)
+
+    -- Anti-AFK
+    VirtualUser:CaptureController()
+    AddConnection(LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end))
+    AddConnection(LocalPlayer.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    end))
+
+    character = LocalPlayer.Character
+    HRP = character:FindFirstChild("HumanoidRootPart")
+    
     pcall(function()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-            LocalPlayer.Character.Head.CustomPlayerTag.PlayerName.Text = getgenv().Name
-            LocalPlayer.Character.Head.CustomPlayerTag.MinerRank.Text = getgenv().Name
-        end
+        character.Head.CustomPlayerTag.PlayerName.Text = getgenv().Name
+        character.Head.CustomPlayerTag.MinerRank.Text = getgenv().Name
     end)
 
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    HRP = char:WaitForChild("HumanoidRootPart")
-
-    Remote = getRemote()
-    if not Remote then 
-        getgenv().Running = false 
-        StartBtn.Text = "▶ START"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
-        return 
-    end
-
-    pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/ProdHallow/Miningsimrebirthtracker/main/miningsimrebirthtracker", true))() end)
-    task.wait(0.5)
-    pcall(function() loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/DeleteAssetMinSim1/main/deleteassetsminingsim'))() end)
-    task.wait(0.5)
-    pcall(function() loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/rebirthtracker/main/rebirthtracker'))() end)
-    task.wait(0.5)
-
-    moveToLavaSpawn()
-    mineUntilDepth(getgenv().Depth)
-
-    local coinsAmountLbl = LocalPlayer.leaderstats.Coins
-    local rebirthsAmount = LocalPlayer.leaderstats.Rebirths
+    repeat task.wait() until game:IsLoaded()
+    ScreenGui = LocalPlayer.PlayerGui:WaitForChild("ScreenGui")
     
-    local function getCoinsAmount()
-        local amount = tostring(coinsAmountLbl.Value):gsub(',', '')
-        return tonumber(amount) or 0
+    while ScreenGui.LoadingFrame.BackgroundTransparency == 0 do
+        for _, connection in pairs(getconnections(ScreenGui.LoadingFrame.Quality.LowQuality.MouseButton1Down)) do
+            connection:Fire()
+        end
+        task.wait()
     end
 
-    RebirthBound = true
-    RunService:BindToRenderStep("Rebirth", Enum.RenderPriority.First.Value, function()
-        if not getgenv().Running then return end
-        if getCoinsAmount() >= (10000000 * (rebirthsAmount.Value + 1)) then
-            Remote:FireServer("Rebirth", {{}})
-            Remote:FireServer("Rebirth", {{}})
-            Remote:FireServer("Rebirth", {{}})
-            task.defer(function()
-                Remote:FireServer("Rebirth", {{}})
-                Remote:FireServer("Rebirth", {{}})
-            end)
+    while true do
+        if pcall(function() LocalPlayer.leaderstats:WaitForChild("Blocks Mined") end) and
+           pcall(function() ScreenGui.StatsFrame.Coins:FindFirstChild("Amount") end) and
+           ScreenGui.StatsFrame.Tokens.Amount.Text ~= "Loading..." then
+            break
         end
-    end)
+        task.wait(1)
+    end
 
-    local depthAmountLbl = ScreenGui.TopInfoFrame.Depth
-    AddConnection(depthAmountLbl.Changed:Connect(function()
-        local depthText = split(depthAmountLbl.Text, " ")
-        local depth = tonumber(depthText[1])
-        if depth and depth >= 1500 and not Recovering and getgenv().Running then
+    pcall(function() ScreenGui.TeleporterFrame:Destroy() end)
+    pcall(function() ScreenGui.StatsFrame.Sell:Destroy() end)
+    pcall(function() ScreenGui.MainButtons.Surface:Destroy() end)
+
+    -- Get remote
+    do
+        local data = getsenv(LocalPlayer.PlayerGui.ScreenGui.ClientScript).displayCurrent
+        local values = getupvalue(data, 8)
+        Remote = values["RemoteEvent"]
+        data, values = nil, nil
+    end
+
+    -- Workspace collapse handler
+    AddConnection(workspace.Collapsed.Changed:Connect(function()
+        if workspace.Collapsed.Value and getgenv().Running then
+            moveToLavaSpawn()
+            mineUntilDepth()
+        end
+    end))
+
+    -- Load external scripts
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ProdHallow/Miningsimrebirthtracker/main/miningsimrebirthtracker", true))()
+    end)
+    task.wait(1)
+    pcall(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/DeleteAssetMinSim1/main/deleteassetsminingsim'))()
+    end)
+    task.wait(1)
+    pcall(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/ProdHallow/rebirthtracker/main/rebirthtracker'))()
+    end)
+    task.wait(1)
+
+    -- Initial move and mine
+    moveToLavaSpawn()
+    mineUntilDepth()
+
+    -- Depth recovery handler
+    local depthAmount = ScreenGui.TopInfoFrame.Depth
+    AddConnection(depthAmount.Changed:Connect(function()
+        local depthText = split(depthAmount.Text, " ")
+        if tonumber(depthText[1]) >= 1500 and not Recovering then
             Recovering = true
             moveToLavaSpawn()
-            task.wait(2)
+            task.wait(5)
             Recovering = false
         end
     end))
 
-    local inventoryLbl = ScreenGui.StatsFrame2.Inventory.Amount
-    local function getInventoryAmount()
-        local amount = tostring(inventoryLbl.Text):gsub('%s+', ''):gsub(',', '')
-        local inv = amount:split("/")
-        return tonumber(inv[1]) or 0
-    end
+    -- Rebirth handler (only in REBIRTH mode)
+    local rebirthsAmount = LocalPlayer.leaderstats.Rebirths
+    RebirthBound = true
+    RunService:BindToRenderStep("Rebirth", Enum.RenderPriority.Camera.Value, function()
+        if not getgenv().Running then return end
+        if getgenv().Mode == "REBIRTH" then
+            if getCoinsAmount() >= (10000000 * (rebirthsAmount.Value + 1)) then
+                Remote:FireServer("Rebirth", {{}})
+                RunService.Heartbeat:Wait()
+            end
+        end
+    end)
 
+    -- Main mining loop
     local sellArea = CFrame.new(41.96064, 14, -1239.64648, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 
     while getgenv().Running do
-        if HRP and HRP.Parent then
-            local miningRange = 10
-            local minp = HRP.CFrame.Position + Vector3.new(-miningRange, -miningRange, -miningRange)
-            local maxp = HRP.CFrame.Position + Vector3.new(miningRange, miningRange, miningRange)
+        if HRP then
+            local minp = HRP.CFrame.Position + Vector3.new(-10, -10, -10)
+            local maxp = HRP.CFrame.Position + Vector3.new(10, 10, 10)
             local region = Region3.new(minp, maxp)
             local parts = workspace:FindPartsInRegion3WithWhiteList(region, {workspace.Blocks}, 100)
 
             for _, block in pairs(parts) do
                 if not getgenv().Running then break end
-                if not HRP or not HRP.Parent then break end
                 
                 if block:IsA("BasePart") then
                     Remote:FireServer("MineBlock", {{block.Parent}})
-                    repeat RunService.Heartbeat:Wait() until not Recovering
+                    repeat
+                        RunService.Heartbeat:Wait()
+                    until not Recovering
                 end
-
-                if getInventoryAmount() >= getgenv().SellThreshold then
-                    if HRP then
-                        local savedPosition = HRP.Position
-                        
-                        while getInventoryAmount() >= getgenv().SellThreshold and getgenv().Running do
-                            HRP.CFrame = sellArea
-                            Remote:FireServer("SellItems", {{}})
-                            Remote:FireServer("SellItems", {{}})
-                            Remote:FireServer("SellItems", {{}})
-                            task.defer(function()
+                
+                -- Only sell in REBIRTH mode
+                if getgenv().Mode == "REBIRTH" then
+                    if getInventoryAmount() >= getgenv().SellThreshold then
+                        if character and HRP then
+                            local savedPosition = HRP.Position
+                            while getInventoryAmount() >= getgenv().SellThreshold and getgenv().Running do
+                                HRP.CFrame = sellArea
                                 Remote:FireServer("SellItems", {{}})
-                                Remote:FireServer("SellItems", {{}})
-                            end)
-                            RunService.RenderStepped:Wait()
-                        end
-
-                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                            LocalPlayer.Character.Humanoid.PlatformStand = true
-                        end
-                        
-                        local startTime = os.time()
-                        while (HRP.Position - savedPosition).Magnitude > 1 and getgenv().Running do
-                            HRP.CFrame = CFrame.new(18, savedPosition.Y + 2, 26220)
-                            RunService.Heartbeat:Wait()
-                            if os.time() - startTime > 5 then break end
-                        end
-                        
-                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                            LocalPlayer.Character.Humanoid.PlatformStand = false
+                                RunService.Heartbeat:Wait()
+                            end
+                            setPlatformStand(true)
+                            local startTime = os.time()
+                            while (HRP.Position - savedPosition).Magnitude > 1 do
+                                HRP.CFrame = CFrame.new(18, savedPosition.Y + 2, 26220)
+                                RunService.Heartbeat:Wait()
+                                if os.time() - startTime > 5 then
+                                    break
+                                end
+                            end
+                            setPlatformStand(false)
                         end
                     end
                 end
             end
-        else
-            break
         end
         RunService.Heartbeat:Wait()
     end
 end
 
-local function monitorEvents()
-    ClearConnections()
+-- Start script function
+local function startScript()
+    if getgenv().Running then return end
+    getgenv().Running = true
+    Recovering = false
+    StartBtn.Text = "⏹ STOP"
+    StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
     
-    AddConnection(LocalPlayer.CharacterAdded:Connect(function()
-        if getgenv().Running then
-            task.wait(2)
-            task.spawn(runBotLogic)
-        end
-    end))
-    
-    AddConnection(workspace.Collapsed.Changed:Connect(function()
-        if workspace.Collapsed.Value and getgenv().Running then
-            task.wait(1)
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                LocalPlayer.Character.Humanoid.Health = 0
-            end
-        end
-    end))
+    task.spawn(main)
 end
 
-local function toggleScript()
+-- Start button connection
+StartBtn.MouseButton1Click:Connect(function()
     if getgenv().Running then
-        getgenv().Running = false
-        ClearConnections()
-        resetCharacterPhysics()
-        Recovering = false
-        StartBtn.Text = "▶ START"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 80)
+        stopScript()
     else
-        getgenv().Running = true
-        Recovering = false
-        StartBtn.Text = "⏹ STOP"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-        monitorEvents()
-        task.spawn(runBotLogic)
+        startScript()
     end
-end
+end)
 
-StartBtn.MouseButton1Click:Connect(toggleScript)
+-- Initialize mode selection
 SelectMode("MINING")
+
+print("HYPER MINER LOADED - GUI READY")
